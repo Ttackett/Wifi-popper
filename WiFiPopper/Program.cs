@@ -11,57 +11,46 @@ namespace ConsoleApp2
     {
         static void Main(string[] args)
         {
-            status();
-            Console.ReadKey();
-            return;
-            while (true)
+            string arg1;
+            if (args == null || args.Length == 0)
             {
-                string arg1;
-                if (args == null || args.Length == 0)
-                    arg1 = Console.ReadLine();
-                else
-                    arg1 = args[0];
-                if (arg1 == "-wifidown")
-                {
-                    if (status() == false)
-                    {
-                        Console.WriteLine("already off");
-                        continue;
-                    }
-                    plink("root@192.168.1.2 -pw admin \". /etc/profile; wifi down\"", true, true);
-                    if (status())
-                        Console.WriteLine("failure");
-                    else Console.WriteLine("success");
-                    //Console.WriteLine("status: " + status().ToString());
-                }
-                if (arg1 == "-wifiup")
-                {
-                    if (status() == true)
-                    {
-                        Console.WriteLine("already on");
-                        continue;
-                    }
-                    plink("root@192.168.1.2 -pw admin \". /etc/profile; wifi up\"", true, true);
-                    if (!status())
-                        Console.WriteLine("failure");
-                    else Console.WriteLine("success");
-                }
-                if (arg1 == "-status")
-                    Console.WriteLine($"status: {status()}");
+                Console.Write("enter command; ");
+                arg1 = Console.ReadLine();
             }
+            else
+                arg1 = args[0];
+            if (arg1 == "-wifidown")
+            {
+                plink("root@192.168.1.2 -pw admin \". /etc/profile; wifi down\"");
+                Console.WriteLine(status);
+            }
+            if (arg1 == "-wifiup")
+            {
+                plink("root@192.168.1.2 -pw admin \". /etc/profile; wifi up\"");
+                Console.WriteLine(status);
+            }
+            if (arg1 == "-status")
+                Console.WriteLine(status);
+            //Console.ReadKey();
+            //}
         }
-        static string wifiName = "MyRV_";
-        static bool status()
+        static string status
         {
-            List<string> output = plink("root@192.168.1.2 -pw admin iwconfig", true, true);
-            foreach (string s in output)
-                if (s.Contains(wifiName))
-                    return true;
-            return false;
+            get
+            {
+                List<string> output = plink("root@192.168.1.2 -pw admin iwconfig");
+                foreach (string s in output)
+                    if (s.Contains("MyRV_"))
+                        return "WIFI_UP";
+                foreach (string s in errLines)
+                    if (s.Contains("FATAL ERROR") || s.Contains("Access denied"))
+                        return "WIFI_STATE_UNKNOWN";
+                return "WIFI_DOWN";
+            }
 
         }
         static List<string> errLines;
-        static List<string> plink(string args, bool skipStdErr = true, bool printOutput = false, string plinkLoc = "")
+        static List<string> plink(string args, bool skipStdErr = true, string plinkLoc = "")
         {
             if (string.IsNullOrEmpty(plinkLoc))
                 plinkLoc = @"C:\Program Files\PuTTY\plink";
@@ -71,26 +60,28 @@ namespace ConsoleApp2
             //argument location on different computers
             startInfo.RedirectStandardError = true;
             startInfo.RedirectStandardOutput = true;
-            startInfo.RedirectStandardInput = true;
             startInfo.UseShellExecute = false;
             startInfo.CreateNoWindow = true;
-            startInfo.Arguments = "root@192.168.1.2 -pw admin iwconfig";
+            startInfo.Arguments = args;
             Process cmd = Process.Start(startInfo);
-            Process process = Process.Start(startInfo);
             string line;
             //if (!skipStdErr)
-                while ((line = cmd.StandardError.ReadLine()) != null)
+            while ((line = cmd.StandardError.ReadLine()) != null)
+            {
+                //Console.WriteLine(line);
+                errLines.Add(line);
+            }
+            foreach (string s in errLines)
+                if (s.Contains("FATAL ERROR") || s.Contains("Access denied"))
                 {
-                    if (printOutput)
-                        Console.WriteLine(line);
-                    errLines.Add(line);
+                    Console.WriteLine("WIFI_STATE_UNKNOWN");
+                    //Console.Read();
+                    Process.GetCurrentProcess().Kill();
                 }
-
             line = "";
             while ((line = cmd.StandardOutput.ReadLine()) != null)
             {
-                if (printOutput)
-                    Console.WriteLine(line);
+                //Console.WriteLine(line);
                 output.Add(line);
             }
             return output;
