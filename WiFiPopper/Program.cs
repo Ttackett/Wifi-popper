@@ -1,16 +1,23 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Diagnostics;
 using System.IO;
-namespace ConsoleApp2
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+
+namespace wifiPopper
 {
     class Program
     {
+        static string date;
+        static string root = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
         static void Main(string[] args)
         {
+            date = DateTime.Now.ToShortDateString().Replace('/', '-');
+            try
+            {
+                File.AppendAllText($"{root}/wifipopper_{date}.txt", "-- new entry --\n");
+            }
+            catch { }
             string arg1;
             if (args == null || args.Length == 0)
             {
@@ -41,11 +48,20 @@ namespace ConsoleApp2
                 List<string> output = plink("root@192.168.1.2 -pw admin iwconfig");
                 foreach (string s in output)
                     if (s.Contains("MyRV_"))
+                    {
+                        appendlog("WIFI_UP",false);
                         return "WIFI_UP";
+                    }
                 foreach (string s in errLines)
                     if (s.Contains("FATAL ERROR") || s.Contains("Access denied"))
+                    {
+                        appendlog("WIFI_STATE_UNKNOWN",true);
                         return "WIFI_STATE_UNKNOWN";
-                return "WIFI_DOWN";
+                    }
+               
+                    appendlog("WIFI_DOWN",false);
+                    return "WIFI_DOWN";
+                
             }
 
         }
@@ -71,10 +87,13 @@ namespace ConsoleApp2
                 //Console.WriteLine(line);
                 errLines.Add(line);
             }
+            appendlog(errLines, true);
+
             foreach (string s in errLines)
                 if (s.Contains("FATAL ERROR") || s.Contains("Access denied"))
                 {
                     Console.WriteLine("WIFI_STATE_UNKNOWN");
+                    appendlog("WIFI_STATE_UNKNOWN", true);
                     //Console.Read();
                     Process.GetCurrentProcess().Kill();
                 }
@@ -84,7 +103,41 @@ namespace ConsoleApp2
                 //Console.WriteLine(line);
                 output.Add(line);
             }
+            appendlog(output, false);
             return output;
+        }
+        static void appendlog(string s, bool tabbed)
+        {
+            while (true)
+            {
+                try
+                {
+                    if (tabbed)
+                        File.AppendAllText($"{root}/wifipopper_{date}.txt", $"\t{s}\n");
+                    else
+                        File.AppendAllText($"{root}/wifipopper_{date}.txt", $"{s}\n");
+                    break;
+                }
+                catch { Thread.Sleep(120); }
+            }
+
+        }
+        static void appendlog(List<string> lines, bool tabbed)
+        {
+            while (true)
+            {
+                try
+                {
+                    foreach (string s in lines)
+                        if (tabbed)
+                            File.AppendAllText($"{root}/wifipopper_{date}.txt", $"\t{s}\n");
+                        else
+                            File.AppendAllText($"{root}/wifipopper_{date}.txt", $"{s}\n");
+                    break;
+                }
+                catch { Thread.Sleep(120); }
+            }
         }
     }
 }
+
